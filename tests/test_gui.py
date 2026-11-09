@@ -143,3 +143,16 @@ def test_convert_keeps_generator_motif_link(win):
     win.convert_to_raster(src)
     assert win.doc.layer(src).kind == RASTER
     assert gen.generator["motif_layer"] == src
+
+
+def test_typing_layer_opacity(win, qtbot):
+    from PySide6.QtCore import Qt
+    win.add_item(Item(RECT, cx=100, cy=100, w=50, h=50))
+    win.settings_panel.setCurrentIndex(0)
+    spin = win.settings_panel.layer_opacity.spin
+    spin.setFocus()
+    spin.selectAll()
+    qtbot.keyClicks(spin, "0.50")
+    qtbot.keyClick(spin, Qt.Key.Key_Tab)
+    assert win.doc.layers[-1].opacity == pytest.approx(0.5)
+    assert win.settings_panel.layer_opacity.value() == pytest.approx(0.5)

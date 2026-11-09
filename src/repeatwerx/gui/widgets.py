@@ -72,6 +72,7 @@ class SliderSpin(QWidget):
         self.spin.setSingleStep(step)
         self.spin.setDecimals(decimals)
         self.spin.setFixedWidth(70)
+        self.spin.setKeyboardTracking(False)
         lay.addWidget(self.slider, 1)
         lay.addWidget(self.spin)
         self.slider.valueChanged.connect(self._from_slider)
