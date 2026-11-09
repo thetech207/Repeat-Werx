@@ -448,7 +448,7 @@ class MainWindow(QMainWindow):
     # ================================================== selection
     def selected_items(self):
         lay = self.doc.layer(self.active_layer_id)
-        if not lay:
+        if not lay or lay.locked:
             return []
         ids = set(self.selection)
         return [it for it in lay.items if it.id in ids]
@@ -481,7 +481,7 @@ class MainWindow(QMainWindow):
 
     def select_all(self):
         lay = self.doc.layer(self.active_layer_id)
-        if lay and lay.kind != GENERATOR:
+        if lay and lay.kind != GENERATOR and not lay.locked:
             self.set_selection([i.id for i in lay.items])
 
     # ===================================================== styles
@@ -566,7 +566,7 @@ class MainWindow(QMainWindow):
                     merge_key=f"item:{key}:{lid}:{','.join(self.selection)}")
 
     def delete_selection(self):
-        if not self.selection:
+        if not self.selected_items():
             return
         ids = set(self.selection)
 
@@ -791,6 +791,7 @@ class MainWindow(QMainWindow):
         def fn():
             out = self._baked(lay)
             out.visible = lay.visible
+            out.id = lay.id
             self.doc.layers[self.doc.layer_index(lid)] = out
             self.active_layer_id = out.id
         self.commit("Bake generator", fn)
@@ -801,7 +802,7 @@ class MainWindow(QMainWindow):
             return
 
         def fn():
-            out = Layer(lay.name, RASTER, visible=lay.visible)
+            out = Layer(lay.name, RASTER, visible=lay.visible, id=lay.id)
             out.items = [self._rasterize(lay)]
             self.doc.layers[self.doc.layer_index(lid)] = out
             self.active_layer_id = out.id
@@ -815,6 +816,12 @@ class MainWindow(QMainWindow):
                                          3000)
             return
         upper, lower = self.doc.layers[i], self.doc.layers[i - 1]
+        if upper.visible != lower.visible:
+            QMessageBox.information(
+                self, "Merge down",
+                f"“{upper.name}” and “{lower.name}” differ in visibility.\n"
+                "Show or hide both layers before merging.")
+            return
         ukind = upper.kind if upper.kind != GENERATOR else (
             RASTER if any(it.kind == IMAGE
                           for it in generate(upper, self.doc)[0])
@@ -828,26 +835,39 @@ class MainWindow(QMainWindow):
             if r != QMessageBox.StandardButton.Yes:
                 return
 
+        def faded(layer, factor):
+            out = []
+            for it in layer.items:
+                c = it.clone()
+                c.opacity = c.opacity * factor
+                out.append(c)
+            return out
+
         def fn():
             up = self._baked(upper) if upper.kind == GENERATOR else upper
             lo = self._baked(lower) if lower.kind == GENERATOR else lower
-            ratio = up.opacity / lo.opacity if lo.opacity > 0 else 1.0
-            moved = []
-            for it in up.items:
-                c = it.clone()
-                c.opacity = min(1.0, c.opacity * ratio)
-                moved.append(c)
-            if up.kind == lo.kind:
-                lo.items = lo.items + moved
-                result = lo
+            if up.kind == lo.kind and up.opacity == lo.opacity:
+                items = faded(lo, 1.0) + faded(up, 1.0)
+                opacity = lo.opacity
+            elif up.kind == lo.kind:
+                items = faded(lo, lo.opacity) + faded(up, up.opacity)
+                opacity = 1.0
             elif lo.kind == RASTER:
-                lo.items = lo.items + [self._rasterize(up)]
-                result = lo
+                items = faded(lo, lo.opacity) + [self._rasterize(up)]
+                opacity = 1.0
             else:
-                result = Layer(lo.name, RASTER, visible=lo.visible)
-                result.items = [self._rasterize(lo)] + moved
+                items = [self._rasterize(lo)] + faded(up, up.opacity)
+                opacity = 1.0
+            kind = lo.kind if up.kind == lo.kind else RASTER
+            result = Layer(lower.name, kind, visible=lower.visible,
+                           locked=lower.locked, opacity=opacity,
+                           items=items, id=lower.id)
             self.doc.layers[i - 1] = result
             self.doc.layers.pop(i)
+            for l in self.doc.layers:
+                if l.kind == GENERATOR and \
+                        l.generator.get("motif_layer") == upper.id:
+                    l.generator["motif_layer"] = result.id
             self.active_layer_id = result.id
             self.selection = []
         self.commit("Merge down", fn)

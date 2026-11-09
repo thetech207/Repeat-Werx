@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QRectF, QSize, QSizeF, QMarginsF
@@ -75,7 +75,7 @@ def export_raster(doc: Document, spec: ExportSpec, path) -> Path:
     if ext not in RASTER_FORMATS:
         raise ValueError(f"unsupported image format: .{ext}")
     if ext not in ALPHA_FORMATS:
-        spec.background = True
+        spec = replace(spec, background=True)
     img = compose(doc, spec)
     if ext in ("jpg", "bmp"):
         flat = QImage(img.size(), QImage.Format.Format_RGB32)

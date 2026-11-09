@@ -158,3 +158,32 @@ def test_export_formats(tmp_path, ext):
     p = export(doc, ExportSpec(mode="grid", tile_px=64, cols=2, rows=2),
                tmp_path / f"out.{ext}")
     assert p.exists() and p.stat().st_size > 0
+
+
+def test_wrap_offsets_cover_oversized_items():
+    from PySide6.QtCore import QRectF
+    from repeatwerx.core.render import wrap_offsets
+    T = 100.0
+    offs = wrap_offsets(QRectF(-150, -150, 400, 400), T)
+    assert len(offs) == 25          # spans x/y in [-150, 250]
+    assert (200.0, -200.0) in offs and (300.0, 0.0) not in offs
+    assert len(wrap_offsets(QRectF(10, 10, 20, 20), T)) == 1
+
+
+def test_export_does_not_mutate_spec(tmp_path):
+    doc, _ = gen_doc(seed=2)
+    spec = ExportSpec(mode="tile", tile_px=32, background=False)
+    export(doc, spec, tmp_path / "a.jpg")
+    assert spec.background is False
+
+
+def test_noise_scaled_motifs_do_not_overlap():
+    doc, lay = gen_doc(algorithm="noise", seed=4, builtin_shape="circle",
+                       noise_drives=["density", "scale"], noise_threshold=0.2,
+                       coverage=0.8, spacing=0.0)
+    items, _ = generate(lay, doc)
+    T = doc.tile_size
+    for i, a in enumerate(items):
+        for b in items[i + 1:]:
+            d = torus_distance((a.cx, a.cy), (b.cx, b.cy), T)
+            assert d >= (a.w + b.w) / 2 * 0.98

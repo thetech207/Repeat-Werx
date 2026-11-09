@@ -84,3 +84,62 @@ def test_save_and_reload(win, tmp_path):
     n = len(win.doc.layers)
     win.load_path(win._file_path)
     assert len(win.doc.layers) == n
+
+
+def test_import_dialog_opens_cleanly(qtbot, tmp_path):
+    from PySide6.QtGui import QImage, QColor
+    from repeatwerx.gui.import_dialog import ImageImportDialog
+    img = QImage(40, 40, QImage.Format.Format_ARGB32)
+    img.fill(QColor("#ffffff"))
+    img.setPixelColor(20, 20, QColor("#000000"))
+    p = tmp_path / "w.png"
+    img.save(str(p))
+    d = ImageImportDialog(str(p), False)
+    qtbot.addWidget(d)
+    assert d.mode_auto.isChecked()
+    assert d.preview.img is not None
+    assert d.result_image().pixelColor(0, 0).alpha() == 0
+
+
+def test_merge_refuses_mixed_visibility(win, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    win.add_item(Item(RECT, cx=100, cy=100, w=50, h=50))
+    win.add_layer(VECTOR)
+    win.add_item(Item(RECT, cx=300, cy=300, w=50, h=50))
+    win.doc.layers[-1].visible = False
+    win.merge_down(win.active_layer_id)
+    assert len(win.doc.layers) == 2
+
+
+def test_merge_preserves_effective_opacity(win):
+    win.add_item(Item(RECT, cx=100, cy=100, w=50, h=50))
+    win.doc.layers[0].opacity = 0.5
+    win.add_layer(VECTOR)
+    win.add_item(Item(RECT, cx=300, cy=300, w=50, h=50))
+    win.doc.layers[1].opacity = 1.0
+    win.merge_down(win.active_layer_id)
+    lay = win.doc.layers[0]
+    eff = sorted(it.opacity * lay.opacity for it in lay.items)
+    assert eff == pytest.approx([0.5, 1.0])
+
+
+def test_locked_layer_not_editable_via_select_all(win):
+    win.add_item(Item(RECT, cx=100, cy=100, w=50, h=50))
+    win.toggle_layer_lock(win.active_layer_id)
+    win.select_all()
+    win.selection = [win.doc.layers[0].items[0].id]
+    win.delete_selection()
+    assert len(win.doc.layers[0].items) == 1
+
+
+def test_convert_keeps_generator_motif_link(win):
+    win.add_item(Item(RECT, cx=100, cy=100, w=50, h=50))
+    src = win.active_layer_id
+    win.add_layer(GENERATOR)
+    win.update_generator("motif_source", "layer")
+    win.update_generator("motif_layer", src)
+    gen = win.doc.layer(win.active_layer_id)
+    win.convert_to_raster(src)
+    assert win.doc.layer(src).kind == RASTER
+    assert gen.generator["motif_layer"] == src

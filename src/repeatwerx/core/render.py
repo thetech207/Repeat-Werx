@@ -122,11 +122,13 @@ def hit_test(item: Item, x: float, y: float, tol: float = 4.0) -> bool:
 def wrap_offsets(rect: QRectF, T: float):
     """Tile-sized offsets at which `rect` overlaps the tile [0,T]^2."""
     tile = QRectF(0, 0, T, T)
+    xs = range(math.floor(-rect.right() / T), math.ceil((T - rect.left()) / T) + 1)
+    ys = range(math.floor(-rect.bottom() / T), math.ceil((T - rect.top()) / T) + 1)
     out = []
-    for ox in (-T, 0.0, T):
-        for oy in (-T, 0.0, T):
-            if rect.translated(ox, oy).intersects(tile):
-                out.append((ox, oy))
+    for kx in xs:
+        for ky in ys:
+            if rect.translated(kx * T, ky * T).intersects(tile):
+                out.append((kx * T, ky * T))
     return out
 
 

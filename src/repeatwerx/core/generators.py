@@ -188,12 +188,13 @@ def _scatter(g, T, rng, field, templates, rfac, afac):
     total = sum(counts)
     if total > 4000:
         counts = [int(c * 4000 / total) for c in counts]
-    maxr = base * max(scales) * 0.5 * (1 + jitter) * max(rfac)
-    pad = max(0.0, float(g["spacing"]))
-    grid = _TorusHash(T, 2 * maxr + pad)
     use_density = (g["algorithm"] == "noise"
                    and "density" in g["noise_drives"])
     use_scale = (g["algorithm"] == "noise" and "scale" in g["noise_drives"])
+    maxr = base * max(scales) * 0.5 * (1 + jitter) * max(rfac) \
+        * (1.4 if use_scale else 1.0)
+    pad = max(0.0, float(g["spacing"]))
+    grid = _TorusHash(T, 2 * maxr + pad)
     thr = float(g["noise_threshold"])
     bw, band = float(g["boundary_weight"]), float(g["boundary_band"])
     out = []

@@ -68,6 +68,9 @@ class ImageImportDialog(QDialog):
             else self.source
         self.detected = imageproc.detect_background(self.source)
         self.picked = self.detected
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(60)
 
         lay = QHBoxLayout(self)
         self.preview = _Preview()
@@ -134,9 +137,6 @@ class ImageImportDialog(QDialog):
         bb.rejected.connect(self.reject)
         side.addWidget(bb)
         lay.addLayout(side)
-        self._timer = QTimer(self)
-        self._timer.setSingleShot(True)
-        self._timer.setInterval(60)
         self._timer.timeout.connect(self._update_preview)
         self._update_preview()
 
