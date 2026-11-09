@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Repeat-Werx
+Comment=Seamless repeating pattern designer
+Exec=repeatwerx
+Icon=repeatwerx
+Categories=Graphics;Office;
+Terminal=false
+StartupWMClass=repeatwerx
